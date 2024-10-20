@@ -1,0 +1,34 @@
+body {
+    font-family: Arial, sans-serif;
+}
+
+#status {
+    margin-bottom: 20px;
+}
+
+#status #system_status {
+    font-size: 24px;
+    font-weight: bold;
+}
+
+#controls, #prediction, #data_saving, #debug {
+    margin-top: 30px;
+}
+
+#controls div, #prediction div, #data_saving div {
+    margin-bottom: 10px;
+}
+
+label {
+    display: inline-block;
+    width: 200px;
+}
+
+input, button {
+    margin-right: 10px;
+}
+
+textarea {
+    width: 100%;
+    box-sizing: border-box;
+}
