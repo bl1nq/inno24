@@ -1,7 +1,7 @@
 #include <Wire.h>
 #include "Adafruit_VL53L1X.h"
 #include <AccelStepper.h>
-#include <Servo.h>
+#include <ESP32Servo.h>
 
 // ---------- VL53L1X Sensor Setup ----------
 #define IRQ_PIN 2
