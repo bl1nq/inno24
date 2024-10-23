@@ -26,7 +26,7 @@ export function Gauge({
     const toRadians = (angle: number) => angle * Math.PI / 180;
 
     useEffect(() => {
-        if (!value || !svgRef.current) return;
+        if (!svgRef.current) return;
         d3.select(svgRef.current).selectAll("*").remove();
 
         const svg = d3
@@ -70,10 +70,13 @@ export function Gauge({
             .attr("x", width / 2 + 2)
             .attr("y", height / 2)
             .attr("text-anchor", "middle")
-            .text(`    ${value.toFixed(2)}${unit}`);
+            .text(`${value.toFixed(2)}${unit}`);
 
 
     }, [value, minValue, maxValue, startAngle, endAngle, unit]);
+
+    console.log("Rendering Gauge", value);
+
     return (
         <>
             <svg ref={svgRef}></svg>

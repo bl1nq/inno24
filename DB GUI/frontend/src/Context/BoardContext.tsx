@@ -29,7 +29,7 @@ const BoardContext = createContext<BoardContextType>({
         'stepper_angle': 0.0,
         'stepper_angular_speed': 0.0,
         'stepper_max_speed': 0.0,
-        'laser_measurements': 0,
+        'distance_buffer_size': 0,
         'timing_budget': 0,
         'system_armed': false,
         'status_message': '',
@@ -64,7 +64,7 @@ function BoardProvider(props: PropsWithChildren<{}>) {
     let [stepperAngle, setStepperAngle] = React.useState<number>(0);
     let [stepperAngularSpeed, setStepperAngularSpeed] = React.useState<number>(0);
     let [stepperMaxSpeed, setStepperMaxSpeed] = React.useState<number>(0);
-    let [laserMeasurements, setLaserMeasurements] = React.useState<number>(0);
+    let [distanceBufferSize, setDistanceBufferSize] = React.useState<number>(0);
     let [timingBudget, setTimingBudget] = React.useState<number>(0);
     let [armed, setArmed] = React.useState<boolean>(false);
     let [status, setStatus] = React.useState<string>("");
@@ -171,7 +171,7 @@ function BoardProvider(props: PropsWithChildren<{}>) {
                 setStepperAngle(data.stepper_angle);
                 setStepperAngularSpeed(data.stepper_angular_speed);
                 setStepperMaxSpeed(data.stepper_max_speed);
-                setLaserMeasurements(data.laser_measurements);
+                setDistanceBufferSize(data.distance_buffer_size);
                 setTimingBudget(data.timing_budget);
                 setArmed(data.system_armed);
                 setStatus(data.status_message);
@@ -247,8 +247,8 @@ function BoardProvider(props: PropsWithChildren<{}>) {
             newSocket.on("update_stepper_max_speed", (data: number) => {
                 setStepperMaxSpeed(data);
             });
-            newSocket.on("update_laser_measurements", (data: number) => {
-                setLaserMeasurements(data);
+            newSocket.on("update_distance_buffer_size", (data: number) => {
+                setDistanceBufferSize(data);
             });
             newSocket.on("update_timing_budget", (data: number) => {
                 setTimingBudget(data);
@@ -285,7 +285,7 @@ function BoardProvider(props: PropsWithChildren<{}>) {
                     'stepper_angle': stepperAngle,
                     'stepper_angular_speed': stepperAngularSpeed,
                     'stepper_max_speed': stepperMaxSpeed,
-                    'laser_measurements': laserMeasurements,
+                    'distance_buffer_size': distanceBufferSize,
                     'timing_budget': timingBudget,
                     'system_armed': armed,
                     'status_message': status,

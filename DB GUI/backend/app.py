@@ -1,4 +1,6 @@
+import struct
 from random import random
+from time import sleep
 
 import eventlet
 
@@ -13,7 +15,7 @@ from flask_socketio import SocketIO, emit
 # For Linux / Mac
 # arduino_port = '/dev/cu.usbmodem113101'
 # For Windows
-arduino_port = 'COM5'
+arduino_port = 'COM4'
 baud_rate = 115200
 
 # Globale Variablen für Sensordaten
@@ -24,7 +26,7 @@ data = {
     'stepper_angle': 0.0,
     'stepper_angular_speed': 0.0,
     'stepper_max_speed': 0.0,
-    'laser_measurements': 0,
+    'distance_buffer_size': 0,
     'timing_budget': 0,
     'system_armed': False,
     'status_message': '',
@@ -33,9 +35,9 @@ data = {
 
 data_grouping = [
     ['esc_speed'],
-    ['stepper_angle', 'stepper_max_speed','stepper_angular_speed'],
+    ['stepper_angle', 'stepper_max_speed', 'stepper_angular_speed'],
     ['distance', 'distance_std_dev'],
-    ['laser_measurements','timing_budget','system_armed', 'status_message', 'debug_messages'],
+    ['laser_measurements', 'timing_budget', 'system_armed', 'status_message', 'debug_messages'],
 ]
 data_struct = {
     'distance': {
@@ -185,53 +187,81 @@ def serial_thread():
         return
 
     while True:
-        if ser.in_waiting > 0:
-            line = ser.readline().decode('utf-8').strip()
-            print("Line: ", line)
-            if line.startswith("DATA,"):
-                tokens = line.split(',')
-                if len(tokens) == 8:
-                    try:
-                        if not float(tokens[1]) == data['distance']:
-                            socketio.emit('update_distance', data['distance'])
+        # Read byte until start of message is received
+        b = ser.read(1)
+        if b != b'\xff':
+            sleep(0.01)
+            continue
 
-                        if not float(tokens[2]) == data['distance_std_dev']:
-                            socketio.emit('update_distance_std_dev', data['distance_std_dev'])
+        # Read command byte
+        command = ser.read(1)
+        if command == b'\x00':
+            received_data = ser.read(34)
+            n1, n2, n3, n4, n5, n6, n7, n8, received_checksum, end = struct.unpack('<2f1i3f2i2B', received_data)
 
-                        if not int(tokens[3]) == data['esc_speed']:
-                            socketio.emit('update_esc_speed', data['esc_speed'])
+            # Recalculate checksum
+            checksum = 0
+            for i in received_data[:-2]:
+                checksum ^= i
 
-                        if not float(tokens[4]) == data['stepper_angle']:
-                            socketio.emit('update_stepper_angle', data['stepper_angle'])
+            if checksum != received_checksum:
+                print("Checksum error", checksum, received_checksum)
+                ser.read(1)
+                continue
 
-                        if not float(tokens[5]) == data['stepper_max_speed']:
-                            socketio.emit('update_stepper_max_speed', data['stepper_max_speed'])
+            print(f"Received data: {n1}, {n2}, {n3}, {n4}, {n5}, {n6}, {n7}, {n8}")
 
-                        if not float(tokens[6]) == data['stepper_angular_speed']:
-                            socketio.emit('update_stepper_angular_speed', data['stepper_angular_speed'])
+            try:
+                if not float(n1) == data['distance']:
+                    socketio.emit('update_distance', float(n1))
 
-                        if not int(tokens[7]) == data['laser_measurements']:
-                            socketio.emit('update_laser_measurements', data['laser_measurements'])
+                if not float(n2) == data['distance_std_dev']:
+                    socketio.emit('update_distance_std_dev', float(n2))
 
-                        if not int(tokens[8]) == data['timing_budget']:
-                            socketio.emit('update_timing_budget', data['timing_budget'])
+                if not int(n3) == data['esc_speed']:
+                    socketio.emit('update_esc_speed', int(n3))
 
-                        data['distance'] = float(tokens[1])
-                        data['distance_std_dev'] = float(tokens[2])
-                        data['esc_speed'] = int(tokens[3])
-                        data['stepper_angle'] = float(tokens[4])
-                        data['stepper_max_speed'] = float(tokens[5])
-                        data['stepper_angular_speed'] = float(tokens[6])
-                        data['laser_measurements'] = int(tokens[7])
-                        data['timing_budget'] = int(tokens[8])
-                    except ValueError:
-                        print("Fehler beim Parsen der Daten.")
-            elif line.startswith("DEBUG,"):
-                debug_message = line[6:]
-                data['debug_messages'].append(debug_message)
-                socketio.emit('update_debug_message', [debug_message])
-            else:
-                print(f"Unbekannte Nachricht: {line}")
+                if not float(n4) == data['stepper_angle']:
+                    socketio.emit('update_stepper_angle', float(n4))
+
+                if not float(n5) == data['stepper_angular_speed']:
+                    socketio.emit('update_stepper_angular_speed', float(n5))
+
+                    if not float(n6) == data['stepper_max_speed']:
+                        socketio.emit('update_stepper_max_speed', float(n6))
+
+                if not int(n7) == data['distance_buffer_size']:
+                    socketio.emit('update_distance_buffer_size', int(n7))
+
+                if not int(n8) == data['timing_budget']:
+                    socketio.emit('update_timing_budget', int(n8))
+
+                data['distance'] = float(n1)
+                data['distance_std_dev'] = float(n2)
+                data['esc_speed'] = int(n3)
+                data['stepper_angle'] = float(n4)
+                data['stepper_angular_speed'] = float(n5)
+                data['stepper_max_speed'] = float(n6)
+                data['distance_buffer_size'] = int(n7)
+                data['timing_budget'] = int(n8)
+            except ValueError:
+                print("Fehler beim Parsen der Daten.")
+        else:
+            length = ser.read(1)
+            message = ser.read(int.from_bytes(length))
+
+            if command == b'\x01':
+                print(f"Message: {message}")
+            elif command == b'\x02':
+                print(f"Debug: {message}")
+            elif command == b'\x03':
+                print(f"Error: {message}")
+            else :
+                print(f"Unknown command: {command}")
+
+            if ser.read(1) != b'\xfe':
+                print("MSG End not found")
+                continue
         time.sleep(0.01)
 
 
@@ -239,70 +269,86 @@ def serial_thread():
 def handle_connect(client):
     print("Client verbunden.", client)
 
+
 @socketio.on('connect_error')
 def handle_connect_error(err):
     print(f"Client connection error: {err}")
+
 
 @socketio.on('get_data')
 def handle_get_data():
     emit('update_data', data)
 
+
 @socketio.on('get_grouping')
 def handle_get_grouping():
     emit('update_grouping', data_grouping)
+
 
 @socketio.on('get_structure')
 def handle_get_structure():
     emit('structure', data_struct)
 
+
 @socketio.on('get_distance')
 def handle_get_distance():
-    emit('update_distance', [data['distance']])
+    emit('update_distance', data['distance'])
+
 
 @socketio.on('get_distance_std_dev')
 def handle_get_distance_std_dev():
     emit('update_distance_std_dev', data['distance_std_dev'])
 
+
 @socketio.on('set_esc_speed')
 def handle_set_esc_speed(value):
-    send_command(f"SET_ESC,{value}")
+    send_command(0x00, int(value))
+
 
 @socketio.on('get_esc_speed')
 def handle_get_esc_speed():
     emit('update_esc_speed', data['esc_speed'])
 
+
 @socketio.on('set_stepper_angle')
 def handle_set_stepper_angle(value):
-    send_command(f"SET_STEPPER_ANGLE,{value}")
+    send_command(0x01, float(value))
+
 
 @socketio.on('get_stepper_angle')
 def handle_get_stepper_angle():
     emit('update_stepper_angle', data['stepper_angle'])
 
+
 @socketio.on('get_stepper_angular_speed')
 def handle_get_stepper_angular_speed():
     emit('update_stepper_angular_speed', data['stepper_angular_speed'])
 
+
 @socketio.on('set_stepper_max_speed')
 def handle_set_stepper_max_speed(value):
-    send_command(f"SET_STEPPER_MAX_SPEED,{value}")
+    send_command(0x03, float(value))
+
 
 @socketio.on('get_stepper_max_speed')
 def handle_get_stepper_max_speed():
     emit('update_stepper_max_speed', data['stepper_max_speed'])
 
 
-@socketio.on('set_laser_measurements')
-def handle_set_laser_measurements(value):
-    send_command(f"SET_LASER_MEASUREMENTS,{value}")
+@socketio.on('set_distance_buffer_size')
+def handle_set_distance_buffer_size(value):
+    send_command(0x04, int(value))
 
-@socketio.on('get_laser_measurements')
-def handle_get_laser_measurements():
+
+@socketio.on('get_distance_buffer_size')
+def handle_get_distance_buffer_size():
     emit('update_laser_measurements', data['laser_measurements'])
+
 
 @socketio.on('set_timing_budget')
 def handle_set_timing_budget(value):
-    send_command(f"SET_TIMING_BUDGET,{value}")
+    send_command(0x05, int(value))
+
 
 @socketio.on('get_timing_budget')
 def handle_get_timing_budget():
@@ -313,26 +359,29 @@ def handle_get_timing_budget():
 def handle_get_system_armed():
     emit('update_system_armed', data['system_armed'])
 
+
 @socketio.on('arm_system')
 def handle_arm_system():
-    data['system_armed'] = True
-    send_command("ARM")
-    emit('update_system_armed', data['system_armed'])
+    send_command(0x06, 1)
+
 
 @socketio.on('disarm_system')
 def handle_disarm_system():
-    data['system_armed'] = False
-    send_command("DISARM")
-    emit('update_system_armed', data['system_armed'])
+    send_command(0x06, 0)
 
 
-
-def send_command(command):
-    print(f"Send command: {command}")
+def send_command(command, value):
+    print(f"Send command: {command} with value {value}")
     global ser
     if ser is not None:
         try:
-            ser.write((command + '\n').encode())
+            # If value is a float, pack it into 4 bytes (float in binary form)
+            if isinstance(value, float):
+                value_bytes = struct.pack('f', value)  # Pack the float as 4 bytes
+            else:
+                value_bytes = struct.pack('i', value)  # Pack the integer as 4 bytes
+
+            ser.write(bytes([command]) + value_bytes)  # Send the command and value bytes
         except Exception as e:
             print(f"Fehler beim Senden des Befehls '{command}': {e}")
     else:
@@ -353,16 +402,14 @@ def randomSimulateSpeed():
         data['esc_speed'] = end
 
 
-
 def randomSimulateAngle():
     global data
     while True:
         start = data['stepper_angle']
         end = random() * 90
 
-
         for i in range(0, 100):
-            data['stepper_angular_speed'] = -0.04 * i**2 + 4 * i
+            data['stepper_angular_speed'] = -0.04 * i ** 2 + 4 * i
             socketio.emit('update_stepper_angular_speed', data['stepper_angular_speed'])
 
             data['stepper_angle'] = start + (end - start) * i / 100
@@ -370,6 +417,7 @@ def randomSimulateAngle():
             time.sleep(0.1)
 
         data['stepper_angle'] = end
+
 
 def randomSimulateDistance():
     global data
@@ -397,12 +445,13 @@ def randomSimulateDistanceSTD():
 
         data['distance_std_dev'] = end
 
+
 if __name__ == '__main__':
     # Starten des seriellen Threads
     threading.Thread(target=serial_thread, daemon=True).start()
-    threading.Thread(target=randomSimulateAngle, daemon=True).start()
-    threading.Thread(target=randomSimulateSpeed, daemon=True).start()
-    threading.Thread(target=randomSimulateDistance, daemon=True).start()
-    threading.Thread(target=randomSimulateDistanceSTD, daemon=True).start()
+    # threading.Thread(target=randomSimulateAngle, daemon=True).start()
+    # threading.Thread(target=randomSimulateSpeed, daemon=True).start()
+    # threading.Thread(target=randomSimulateDistance, daemon=True).start()
+    # threading.Thread(target=randomSimulateDistanceSTD, daemon=True).start()
     # Starten des Flask-Servers mit eventlet
-    socketio.run(app, host='127.0.0.1', port=8888)
+    socketio.run(app, host='0.0.0.0', port=8888)

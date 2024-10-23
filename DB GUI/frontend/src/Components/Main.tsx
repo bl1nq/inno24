@@ -105,23 +105,23 @@ export function Main() {
             },
             'autoUpdate': true,
         },
-        'laser_measurements': {
+        'distance_buffer_size': {
             'unit': '',
             'type': 'number',
             'constraints': [],
             'commands': {
                 'set': {
-                    'name': 'set_laser_measurements', type: "set",
-                    'parameter': {'name': 'New Laser Measurements', 'type': 'number', 'required': true}
+                    'name': 'set_distance_buffer_size', type: "set",
+                    'parameter': {'name': 'New Buffer Size', 'type': 'number', 'required': true}
                 },
-                'get': {'name': 'get_laser_measurements', type: "get",},
+                'get': {'name': 'get_distance_buffer_size', type: "get",},
             },
             'autoUpdate': true,
         },
         'timing_budget': {
-            'unit': 'ms',
+            'unit': 'us',
             'type': 'number',
-            'constraints': [],
+            'constraints': [[33000,100000]],
             'commands': {
                 'set': {
                     'name': 'set_timing_budget', type: "set",
@@ -178,8 +178,8 @@ export function Main() {
                         <div className={"group-card group-card-3"}>
                             <InfoCard k={"esc_speed"} value={data.esc_speed} structure={data_struct["esc_speed"]}
                                       dataHistory={boardCtx.escSpeedHistory}/>
-                            <InfoCard k={"laser_measurements"} value={data.laser_measurements}
-                                      structure={data_struct["laser_measurements"]}/>
+                            <InfoCard k={"distance_buffer_size"} value={data.distance_buffer_size}
+                                      structure={data_struct["distance_buffer_size"]}/>
                             <InfoCard k={"timing_budget"} value={data.timing_budget}
                                       structure={data_struct["timing_budget"]}/>
                         </div>

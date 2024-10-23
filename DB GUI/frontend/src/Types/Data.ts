@@ -8,7 +8,7 @@ export interface Data {
     'stepper_angle': number
     'stepper_angular_speed': number
     'stepper_max_speed': number
-    'laser_measurements': number
+    'distance_buffer_size': number
     'timing_budget': number
     'system_armed': boolean,
     'status_message': string
