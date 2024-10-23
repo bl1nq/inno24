@@ -1,12 +1,50 @@
-import {useSettings} from "../Context/SettingsContext";
-import {Form} from "react-bootstrap";
-import {clearTimeout} from "node:timers";
+import { useSettings } from "../Context/SettingsContext";
+import { Form } from "react-bootstrap";
+import React, { useEffect, useRef } from "react";
 
 export function Settings() {
     const ctx = useSettings();
-    let t1: NodeJS.Timeout,
-        t2: NodeJS.Timeout, t3: NodeJS.Timeout, t4: NodeJS.Timeout;
 
+    // Use state hooks for the form inputs
+    const [s1, setS1] = React.useState(ctx.numPointsESCSpeed);
+    const [s2, setS2] = React.useState(ctx.numPointsStepperAngularSpeed);
+    const [s3, setS3] = React.useState(ctx.numPointsDistance);
+    const [s4, setS4] = React.useState(ctx.numPointsDistanceStdDev);
+
+    // Use refs to store timeout IDs
+    const timeoutRef = useRef<{
+        [key: string]: NodeJS.Timeout
+    }>({});
+
+    // Generic function to update settings context with a delay
+    const updateSetting = (key: string, value: number, setter: (x:number) => void) => {
+        // Clear existing timeout for the key
+        if (timeoutRef.current[key]) {
+            clearTimeout(timeoutRef.current[key]);
+        }
+
+        // Set a new timeout to delay the update
+        timeoutRef.current[key] = setTimeout(() => {
+            setter(value);  // Call the context setter function
+        }, 500);
+    };
+
+    // UseEffect for each input to trigger the updateSetting function on change
+    useEffect(() => {
+        updateSetting('escSpeed', s1, ctx.setNumPointsESCSpeed);
+    }, [s1]);
+
+    useEffect(() => {
+        updateSetting('stepperAngularSpeed', s2, ctx.setNumPointsStepperAngularSpeed);
+    }, [s2]);
+
+    useEffect(() => {
+        updateSetting('distance', s3, ctx.setNumPointsDistance);
+    }, [s3]);
+
+    useEffect(() => {
+        updateSetting('distanceStdDev', s4, ctx.setNumPointsDistanceStdDev);
+    }, [s4]);
 
     return (
         <div className={"settings"}>
@@ -14,62 +52,44 @@ export function Settings() {
                 <Form>
                     <div>
                         <Form.Label column={"sm"}>Number of points for ESC speed graph:</Form.Label>
-                        <Form.Control type={"number"} value={ctx.numPointsESCSpeed}
-                                      onChange={(ev) => {
-                                          clearTimeout(t1);
-                                          t1 = setTimeout(() => {
-                                              ctx.setNumPointsESCSpeed(parseInt(ev.target.value) || 100);
-                                          }, 500);
-                                      }}
-                        />
+                        <Form.Control
+                            type={"number"}
+                            value={s1}
+                            onChange={(ev) => setS1(parseInt(ev.target.value) || 0)} />
                     </div>
                     <div>
                         <Form.Label column={"sm"}>Number of points for Stepper Angular Speed graph:</Form.Label>
-                        <Form.Control type={"number"} value={ctx.numPointsStepperAngularSpeed}
-                                      onChange={(ev) => {
-                                          clearTimeout(t2);
-                                          t2 = setTimeout(() => {
-                                              ctx.setNumPointsStepperAngularSpeed(parseInt(ev.target.value) || 100);
-                                          }, 500);
-                                      }}
-                        />
+                        <Form.Control
+                            type={"number"}
+                            value={s2}
+                            onChange={(ev) => setS2(parseInt(ev.target.value) || 0)} />
                     </div>
                     <div>
                         <Form.Label column={"sm"}>Number of points for Distance graph:</Form.Label>
-                        <Form.Control type={"number"} value={ctx.numPointsDistance}
-                                      onChange={(ev) => {
-                                          clearTimeout(t3);
-                                          t3 = setTimeout(() => {
-                                              ctx.setNumPointsDistance(parseInt(ev.target.value) || 100);
-                                          }, 500);
-                                      }}
-                        />
+                        <Form.Control
+                            type={"number"}
+                            value={s3}
+                            onChange={(ev) => setS3(parseInt(ev.target.value) || 0)} />
                     </div>
                     <div>
                         <Form.Label column={"sm"}>Number of points for Distance Std Dev graph:</Form.Label>
-                        <Form.Control type={"number"} value={ctx.numPointsDistanceStdDev}
-                                      onChange={(ev) => {
-                                          clearTimeout(t4);
-                                          t4 = setTimeout(() => {
-                                              ctx.setNumPointsDistanceStdDev(parseInt(ev.target.value) || 100);
-                                          }, 500);
-                                      }}
-                        />
+                        <Form.Control
+                            type={"number"}
+                            value={s4}
+                            onChange={(ev) => setS4(parseInt(ev.target.value) || 0)} />
                     </div>
                 </Form>
             </div>
             <div></div>
             <div>
                 <Form>
-                    <Form.Check type={"checkbox"}
-                                label={"Pause graph updates"}
-                                checked={ctx.pauseGraphUpdates}
-                                onChange={(ev) => {
-                                    ctx.setPauseGraphUpdates(ev.target.checked);
-                                }}
-                    />
+                    <Form.Check
+                        type={"checkbox"}
+                        label={"Pause graph updates"}
+                        checked={ctx.pauseGraphUpdates}
+                        onChange={(ev) => ctx.setPauseGraphUpdates(ev.target.checked)} />
                 </Form>
             </div>
         </div>
-    )
+    );
 }
