@@ -6,18 +6,21 @@ import {Footer} from "./Components/Footer";
 import './customTheme.scss';
 import {BoardProvider} from './Context/BoardContext';
 import {StoreProvider} from "./Context/StoreContext";
+import {SettingsProvider} from "./Context/SettingsContext";
 
 function App() {
 
     return (
         <div className="App">
-            <StoreProvider>
-                <BoardProvider>
-                    <Header/>
-                    <Main/>
-                    <Footer/>
-                </BoardProvider>
-            </StoreProvider>
+            <SettingsProvider>
+                <StoreProvider>
+                    <BoardProvider>
+                        <Header/>
+                        <Main/>
+                        <Footer/>
+                    </BoardProvider>
+                </StoreProvider>
+            </SettingsProvider>
         </div>
     );
 }

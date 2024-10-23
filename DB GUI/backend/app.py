@@ -8,13 +8,12 @@ import serial
 import time
 from flask import Flask
 from flask_socketio import SocketIO, emit
-import pandas as pd
 
 # Serielle Kommunikation initialisieren
 # For Linux / Mac
 # arduino_port = '/dev/cu.usbmodem113101'
 # For Windows
-arduino_port = 'COM3'
+arduino_port = 'COM5'
 baud_rate = 115200
 
 # Globale Variablen für Sensordaten
@@ -24,6 +23,9 @@ data = {
     'esc_speed': 0,
     'stepper_angle': 0.0,
     'stepper_angular_speed': 0.0,
+    'stepper_max_speed': 0.0,
+    'laser_measurements': 0,
+    'timing_budget': 0,
     'system_armed': False,
     'status_message': '',
     'debug_messages': [],
@@ -31,26 +33,139 @@ data = {
 
 data_grouping = [
     ['esc_speed'],
-    ['stepper_angle', 'stepper_angular_speed'],
+    ['stepper_angle', 'stepper_max_speed','stepper_angular_speed'],
     ['distance', 'distance_std_dev'],
-    ['system_armed','status_message', 'debug_messages'],
+    ['laser_measurements','timing_budget','system_armed', 'status_message', 'debug_messages'],
 ]
-
-commands = [
-    {"name": 'set_esc_speed', "for": 'esc_speed',
-     "parameter": {"name": "New ESC Speed", "type": "number", "required": True, "min": 1060, "max": 2000}},
-    {"name": 'set_stepper_angle', "for": 'stepper_angle',
-     "parameter": {"name": "New Stepper Angle", "type": "number", "required": True, "min": 0, "max": 360}},
-    {"name": 'set_stepper_angular_speed', "for": 'stepper_angular_speed',
-     "parameter": {"name": "New Stepper Angular Speed", "type": "number", "required": True, "min": 0, "max": 100}},
-    {"name": 'arm_system', "for": 'system_armed',
-     "parameter": {"name": "Arm System", "type": "boolean", "required": False}},
-    {"name": 'disarm_system', "for": 'system_armed',
-     "parameter": {"name": "Disarm System", "type": "boolean", "required": False}},
-    {"name": 'save_data', "for": 'data',
-     "parameter": {"name": "Filename", "type": "string", "required": True}},
-    {"name": 'get_distance', "for": 'distance', "parameter": {}},
-]
+data_struct = {
+    'distance': {
+        'unit': 'mm',
+        'type': 'number',
+        'constraints': [],
+        'commands': {
+            'get': {'name': 'get_distance', 'parameter': {}},
+        },
+        'graph': {
+            'type': 'line',
+        },
+        'autoupdate': True,
+    },
+    'distance_std_dev': {
+        'unit': 'mm',
+        'type': 'number',
+        'constraints': [],
+        'commands': {
+            'get': {'name': 'get_distance_std_dev', 'parameter': {}},
+        },
+        'graph': {
+            'type': 'line',
+        },
+        'autoupdate': True,
+    },
+    'esc_speed': {
+        'unit': 'MHz',
+        'type': 'number',
+        'constraints': [0, [1060, 2000]],
+        'commands': {
+            'get': {'name': 'get_esc_speed', 'parameter': {}},
+            'set': {'name': 'set_esc_speed',
+                    'parameter': {'name': 'New ESC Speed', 'type': 'number', 'required': True}},
+        },
+        'graph': {
+            'type': 'line',
+        },
+        'autoupdate': True,
+    },
+    'stepper_angle': {
+        'unit': '°',
+        'type': 'number',
+        'constraints': [[0, 90]],
+        'commands': {
+            'get': {'name': 'get_stepper_angle', 'parameter': {}},
+            'set': {'name': 'set_stepper_angle',
+                    'parameter': {'name': 'New Stepper Angle', 'type': 'number', 'required': True}},
+        },
+        'graph': {
+            'type': 'circular',
+        },
+        'autoupdate': True,
+    },
+    'stepper_angular_speed': {
+        'unit': 'deg/s',
+        'type': 'number',
+        'constraints': [[0, 1000]],
+        'commands': {
+            'get': {'name': 'get_stepper_angular_speed', 'parameter': {}},
+        },
+        'graph': {
+            'type': 'line',
+        },
+        'autoupdate': True,
+    },
+    'stepper_max_speed': {
+        'unit': 'deg/s',
+        'type': 'number',
+        'constraints': [[0, 1000]],
+        'commands': {
+            'set': {'name': 'set_stepper_max_speed',
+                    'parameter': {'name': 'New Stepper Max Speed', 'type': 'number', 'required': True}},
+            'get': {'name': 'get_stepper_max_speed', 'parameter': {}},
+        },
+        'autoupdate': True,
+    },
+    'laser_measurements': {
+        'unit': '',
+        'type': 'number',
+        'constraints': [],
+        'commands': {
+            'set': {'name': 'set_laser_measurements',
+                    'parameter': {'name': 'New Laser Measurements', 'type': 'number', 'required': True}},
+            'get': {'name': 'get_laser_measurements', 'parameter': {}},
+        },
+        'autoupdate': True,
+    },
+    'timing_budget': {
+        'unit': 'ms',
+        'type': 'number',
+        'constraints': [],
+        'commands': {
+            'set': {'name': 'set_timing_budget',
+                    'parameter': {'name': 'New Timing Budget', 'type': 'number', 'required': True}},
+            'get': {'name': 'get_timing_budget', 'parameter': {}},
+        },
+        'autoupdate': True,
+    },
+    'system_armed': {
+        'unit': '',
+        'type': 'boolean',
+        'constraints': [],
+        'commands': {
+            'get': {'name': 'get_system_armed', 'parameter': {}},
+            'arm': {'name': 'arm_system', 'parameter': {'name': 'Arm System', 'type': 'boolean', 'required': False}},
+            'disarm': {'name': 'disarm_system',
+                       'parameter': {'name': 'Disarm System', 'type': 'boolean', 'required': False}},
+        },
+        'autoupdate': True,
+    },
+    'status_message': {
+        'unit': '',
+        'type': 'string',
+        'constraints': [],
+        'commands': {
+            'get': {'name': 'get_status_message', 'parameter': {}},
+        },
+        'autoupdate': True,
+    },
+    'debug_messages': {
+        'unit': '',
+        'type': 'string[]',
+        'constraints': [],
+        'commands': {
+            'get': {'name': 'get_debug_messages', 'parameter': {}},
+        },
+        'autoupdate': True,
+    },
+}
 
 ser = None  # Globale Variable für die serielle Verbindung
 
@@ -72,115 +187,144 @@ def serial_thread():
     while True:
         if ser.in_waiting > 0:
             line = ser.readline().decode('utf-8').strip()
+            print("Line: ", line)
             if line.startswith("DATA,"):
                 tokens = line.split(',')
-                if len(tokens) == 6:
+                if len(tokens) == 8:
                     try:
-                        newData = {'distance': float(tokens[1]), 'distance_std_dev': float(tokens[2]),
-                                   'esc_speed': int(tokens[3]), 'stepper_angle': float(tokens[4]),
-                                   'stepper_angular_speed': float(tokens[5])}
-                        # Sende die aktuellen Daten an die Weboberfläche
-                        # If any data changed, emit the update_data event
-                        if newData != data:
-                            data = newData
-                            socketio.emit('update_data', data)
+                        if not float(tokens[1]) == data['distance']:
+                            socketio.emit('update_distance', data['distance'])
+
+                        if not float(tokens[2]) == data['distance_std_dev']:
+                            socketio.emit('update_distance_std_dev', data['distance_std_dev'])
+
+                        if not int(tokens[3]) == data['esc_speed']:
+                            socketio.emit('update_esc_speed', data['esc_speed'])
+
+                        if not float(tokens[4]) == data['stepper_angle']:
+                            socketio.emit('update_stepper_angle', data['stepper_angle'])
+
+                        if not float(tokens[5]) == data['stepper_max_speed']:
+                            socketio.emit('update_stepper_max_speed', data['stepper_max_speed'])
+
+                        if not float(tokens[6]) == data['stepper_angular_speed']:
+                            socketio.emit('update_stepper_angular_speed', data['stepper_angular_speed'])
+
+                        if not int(tokens[7]) == data['laser_measurements']:
+                            socketio.emit('update_laser_measurements', data['laser_measurements'])
+
+                        if not int(tokens[8]) == data['timing_budget']:
+                            socketio.emit('update_timing_budget', data['timing_budget'])
+
+                        data['distance'] = float(tokens[1])
+                        data['distance_std_dev'] = float(tokens[2])
+                        data['esc_speed'] = int(tokens[3])
+                        data['stepper_angle'] = float(tokens[4])
+                        data['stepper_max_speed'] = float(tokens[5])
+                        data['stepper_angular_speed'] = float(tokens[6])
+                        data['laser_measurements'] = int(tokens[7])
+                        data['timing_budget'] = int(tokens[8])
                     except ValueError:
                         print("Fehler beim Parsen der Daten.")
             elif line.startswith("DEBUG,"):
                 debug_message = line[6:]
                 data['debug_messages'].append(debug_message)
-                socketio.emit('debug_message', {'message': debug_message})
+                socketio.emit('update_debug_message', [debug_message])
             else:
                 print(f"Unbekannte Nachricht: {line}")
         time.sleep(0.01)
 
 
 @socketio.on('connect')
-def handle_connect():
-    print("Client verbunden.")
+def handle_connect(client):
+    print("Client verbunden.", client)
 
 @socketio.on('connect_error')
 def handle_connect_error(err):
     print(f"Client connection error: {err}")
 
-
 @socketio.on('get_data')
 def handle_get_data():
-    emit('update_data', [data, data_grouping])
+    emit('update_data', data)
 
+@socketio.on('get_grouping')
+def handle_get_grouping():
+    emit('update_grouping', data_grouping)
 
-@socketio.on('get_commands')
-def handle_get_commands():
-    emit('commands', commands)
+@socketio.on('get_structure')
+def handle_get_structure():
+    emit('structure', data_struct)
 
+@socketio.on('get_distance')
+def handle_get_distance():
+    emit('update_distance', [data['distance']])
+
+@socketio.on('get_distance_std_dev')
+def handle_get_distance_std_dev():
+    emit('update_distance_std_dev', data['distance_std_dev'])
 
 @socketio.on('set_esc_speed')
 def handle_set_esc_speed(value):
     send_command(f"SET_ESC,{value}")
 
+@socketio.on('get_esc_speed')
+def handle_get_esc_speed():
+    emit('update_esc_speed', data['esc_speed'])
 
 @socketio.on('set_stepper_angle')
 def handle_set_stepper_angle(value):
     send_command(f"SET_STEPPER_ANGLE,{value}")
+
+@socketio.on('get_stepper_angle')
+def handle_get_stepper_angle():
+    emit('update_stepper_angle', data['stepper_angle'])
+
+@socketio.on('get_stepper_angular_speed')
+def handle_get_stepper_angular_speed():
+    emit('update_stepper_angular_speed', data['stepper_angular_speed'])
+
+@socketio.on('set_stepper_max_speed')
+def handle_set_stepper_max_speed(value):
+    send_command(f"SET_STEPPER_MAX_SPEED,{value}")
+
+@socketio.on('get_stepper_max_speed')
+def handle_get_stepper_max_speed():
+    emit('update_stepper_max_speed', data['stepper_max_speed'])
 
 
 @socketio.on('set_laser_measurements')
 def handle_set_laser_measurements(value):
     send_command(f"SET_LASER_MEASUREMENTS,{value}")
 
+@socketio.on('get_laser_measurements')
+def handle_get_laser_measurements():
+    emit('update_laser_measurements', data['laser_measurements'])
 
 @socketio.on('set_timing_budget')
 def handle_set_timing_budget(value):
     send_command(f"SET_TIMING_BUDGET,{value}")
 
-
-@socketio.on('reset_stepper_zero')
-def handle_reset_stepper_zero():
-    send_command("RESET_STEPPER_ZERO")
-
-
-@socketio.on('set_stepper_max_speed')
-def handle_set_stepper_max_speed(value):
-    send_command(f"SET_STEPPER_MAX_SPEED,{value}")
+@socketio.on('get_timing_budget')
+def handle_get_timing_budget():
+    emit('update_timing_budget', data['timing_budget'])
 
 
-@socketio.on('set_stepper_accel')
-def handle_set_stepper_accel(value):
-    send_command(f"SET_STEPPER_ACCEL,{value}")
-
+@socketio.on('get_system_armed')
+def handle_get_system_armed():
+    emit('update_system_armed', data['system_armed'])
 
 @socketio.on('arm_system')
-def handle_arm_system(value):
+def handle_arm_system():
     data['system_armed'] = True
     send_command("ARM")
-    emit('system_status', {'armed': True})
-
+    emit('update_system_armed', data['system_armed'])
 
 @socketio.on('disarm_system')
-def handle_disarm_system(value):
+def handle_disarm_system():
     data['system_armed'] = False
     send_command("DISARM")
-    emit('system_status', {'armed': False})
+    emit('update_system_armed', data['system_armed'])
 
-
-@socketio.on('save_data')
-def handle_save_data(payload):
-    filename = payload.get('filename', 'data.csv')
-    actual_distance = payload.get('actual_distance', 0.0)
-    # Daten speichern
-    df = pd.DataFrame([{
-        'distance': data['distance'],
-        'distance_std_dev': data['distance_std_dev'],
-        'esc_speed': data['esc_speed'],
-        'stepper_angle': data['stepper_angle'],
-        'stepper_angular_speed': data['stepper_angular_speed'],
-        'actual_distance': actual_distance
-    }])
-    try:
-        df.to_csv(filename, mode='a', header=not pd.io.common.file_exists(filename), index=False)
-        emit('debug_message', {'message': f"Daten gespeichert in {filename}"})
-    except Exception as e:
-        emit('debug_message', {'message': f"Fehler beim Speichern der Daten: {e}"})
 
 
 def send_command(command):
@@ -194,25 +338,71 @@ def send_command(command):
     else:
         print(f"Serielle Verbindung nicht initialisiert. Befehl '{command}' konnte nicht gesendet werden.")
 
-def value_thread():
-    while True:
-        data = {
-            'distance': random() * 100,
-            'distance_std_dev':random() * 10,
-            'esc_speed': random() * 1000 + 1000,
-            'stepper_angle': random() * 90,
-            'stepper_angular_speed': random() * 100,
-            'system_armed': True,
-            'status_message': '',
-            'debug_messages': [],
-        }
 
-        socketio.emit('update_data', [data, data_grouping])
-        time.sleep(0.5)
+def randomSimulateSpeed():
+    global data
+    while True:
+        start = data['esc_speed']
+        end = 1000 + random() * 1000
+
+        for i in range(0, 100):
+            data['esc_speed'] = start + (end - start) * i / 100
+            socketio.emit('update_esc_speed', data['esc_speed'])
+            time.sleep(0.1)
+
+        data['esc_speed'] = end
+
+
+
+def randomSimulateAngle():
+    global data
+    while True:
+        start = data['stepper_angle']
+        end = random() * 90
+
+
+        for i in range(0, 100):
+            data['stepper_angular_speed'] = -0.04 * i**2 + 4 * i
+            socketio.emit('update_stepper_angular_speed', data['stepper_angular_speed'])
+
+            data['stepper_angle'] = start + (end - start) * i / 100
+            socketio.emit('update_stepper_angle', data['stepper_angle'])
+            time.sleep(0.1)
+
+        data['stepper_angle'] = end
+
+def randomSimulateDistance():
+    global data
+    while True:
+        start = data['distance']
+        end = random() * 5000
+
+        for i in range(0, 1000):
+            data['distance'] = start + (end - start) * i / 1000
+            socketio.emit('update_distance', data['distance'])
+            time.sleep(0.001)
+        data['distance'] = end
+
+
+def randomSimulateDistanceSTD():
+    global data
+    while True:
+        start = data['distance_std_dev']
+        end = random() * 21 - 1
+
+        for i in range(0, 1000):
+            data['distance_std_dev'] = start + (end - start) * i / 1000
+            socketio.emit('update_distance_std_dev', data['distance_std_dev'])
+            time.sleep(0.01)
+
+        data['distance_std_dev'] = end
 
 if __name__ == '__main__':
     # Starten des seriellen Threads
     threading.Thread(target=serial_thread, daemon=True).start()
-    threading.Thread(target=value_thread, daemon=True).start()
+    threading.Thread(target=randomSimulateAngle, daemon=True).start()
+    threading.Thread(target=randomSimulateSpeed, daemon=True).start()
+    threading.Thread(target=randomSimulateDistance, daemon=True).start()
+    threading.Thread(target=randomSimulateDistanceSTD, daemon=True).start()
     # Starten des Flask-Servers mit eventlet
     socketio.run(app, host='127.0.0.1', port=8888)

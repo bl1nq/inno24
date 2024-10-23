@@ -1,7 +1,7 @@
 #include <Wire.h>
 #include "Adafruit_VL53L1X.h"
 #include <AccelStepper.h>
-#include <ESP32Servo.h>
+#include <Servo.h>
 
 // ---------- VL53L1X Sensor Setup ----------
 #define IRQ_PIN 2
@@ -14,7 +14,7 @@ Adafruit_VL53L1X vl53 = Adafruit_VL53L1X(XSHUT_PIN, IRQ_PIN);
 AccelStepper stepper(AccelStepper::DRIVER, STEPPER_STEP_PIN, STEPPER_DIR_PIN);
 
 const float GEAR_RATIO = 31.0 / 3.0; // Übersetzung
-const float STEPS_PER_REV = 200.0;   // 1.8 Grad Schritte
+const float STEPS_PER_REV = 200.0 * 8;   // 1.8 Grad Schritte
 const float DEGREE_PER_STEP = (360.0 / (STEPS_PER_REV * GEAR_RATIO)); // Grad pro Schritt
 
 // ---------- ESC (BL Motor) Setup ----------
@@ -41,6 +41,7 @@ float currentStepperAngle = 0.0;
 float previousStepperAngle = 0.0;
 unsigned long previousStepperTime = 0;
 float stepperAngularSpeed = 0.0; // in degrees per second
+float stepperMaxSpeed;
 
 void setup() {
   Serial.begin(115200);
@@ -182,7 +183,13 @@ void sendDataOverSerial() {
   Serial.print(",");
   Serial.print(currentStepperAngle); // Aktueller Winkel
   Serial.print(",");
-  Serial.println(stepperAngularSpeed); // Winkelgeschwindigkeit
+  Serial.print(stepperMaxSpeed);
+  Serial.print(",");
+  Serial.print(stepperAngularSpeed); // Winkelgeschwindigkeit
+  Serial.print(",");
+  Serial.print(numLaserMeasurements);
+  Serial.print(",");
+  Serial.println(timingBudget);
 }
 
 void processSerialInput(String input) {
@@ -216,6 +223,7 @@ void processSerialInput(String input) {
   } else if (input.startsWith("SET_STEPPER_MAX_SPEED,")) {
     float value = input.substring(21).toFloat();
     stepper.setMaxSpeed(value);
+    stepperMaxSpeed = value;
     Serial.println("DEBUG,Stepper Max Geschwindigkeit gesetzt auf " + String(value));
   } else if (input.startsWith("SET_STEPPER_ACCEL,")) {
     float value = input.substring(17).toFloat();

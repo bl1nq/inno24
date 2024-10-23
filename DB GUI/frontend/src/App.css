@@ -1,7 +1,8 @@
 :root {
     --main-color: #243642;
     --secondary-color: #387478;
-    --accent-color: #E2F1E7;
+    --white-color: #E2F1E7;
+    --accent-color: #FF3D00;
 }
 
 body {
@@ -9,10 +10,54 @@ body {
     font-family: Roboto, sans-serif;
     background-color: var(--main-color);
     color: white;
+
+    .offcanvas {
+        background-color: var(--main-color);
+        color: white;
+
+        button {
+            color: var(--white-color) !important;
+        }
+
+        .settings {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: 1fr;
+            grid-gap: 20px;
+
+            >.settings-numpoints{
+                display: grid;
+                grid-template-rows: 1fr 1fr 1fr 1fr;
+                grid-template-columns: 1fr;
+
+                div {
+                    padding: 5px;
+                    display: flex;
+                    flex-direction: row;
+                    align-items: center;
+                    font-size: 20px;
+                    cursor: pointer;
+
+
+                    > input {
+                        width: 20%;
+                        text-align: right;
+                    }
+                }
+            }
+        }
+    }
 }
 
 p {
     margin: 0 !important;
+}
+
+.line {
+    width: 100%;
+    height: 0;
+    border-bottom: 1px solid gray;
+    padding: 5px;
 }
 
 .App {
@@ -38,7 +83,13 @@ header {
     justify-content: space-between;
 
     > div {
-        width: 250px;
+        width: 300px;
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        > div {
+            width: 80%;
+        }
     }
 
     .custom-option {
@@ -123,45 +174,95 @@ main {
 
     > .data-grid {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr 1fr 1fr;
         grid-gap: 20px;
 
         .group-card {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            grid-template-rows: repeat(auto-fit, minmax(200px, max-content));
             grid-gap: 20px;
             padding: 20px;
-
             justify-content: center;
             border: 1px solid white;
             border-radius: 20px;
-            box-shadow: 0 0 10px var(--secondary-color);
+            box-shadow: 0 0 20px var(--secondary-color);
         }
 
-        .group-card:has(.card:only-child) {
-            grid-template-columns: 60%;
-            grid-template-rows: fit-content(100%);
+        .group-card-4 {
+            grid-template-areas: "card1 card1 card1"
+                                "card2 card3 card4";
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: 2fr 1fr;
+
+            div:first-child {
+                grid-area: card1;
+            }
+
+            div:nth-child(2) {
+                grid-area: card2;
+            }
+
+            div:nth-child(3) {
+                grid-area: card3;
+            }
+
+            div:last-child {
+                grid-area: card4;
+            }
+
+        }
+
+        .group-card-2 {
+            grid-template-columns: 1fr;
+        }
+
+        .group-card-3 {
+            grid-template-areas: "card1 card1"
+                                    "card2 card3";
+            grid-template-columns: 1fr 1fr;
+
+            div:first-child {
+                grid-area: card1;
+            }
+
+            div:nth-child(2) {
+                grid-area: card2;
+            }
+
+            div:last-child {
+                grid-area: card3;
+            }
+        }
+
+        .grid line {
+            stroke: lightgrey;
+            stroke-opacity: 0.7;
+            shape-rendering: crispEdges;
+        }
+
+        .grid path {
+            stroke-width: 0;
         }
 
         .card {
             font-weight: 500;
-            background-color: var(--accent-color);
+            background-color: var(--white-color);
             color: var(--main-color);
             padding: 20px;
             border-radius: 10px;
             box-shadow: 0 0 10px var(--main-color);
+            flex-grow: 1;
 
             .card-body {
                 display: flex;
                 flex-direction: column;
                 align-items: center;
-                padding-right: 0;
-                padding-left: 0;
+                justify-content: space-between;
+                padding:0;
             }
 
             .card-header {
-                font-size: 18px !important;
+                font-size: 1em!important;
+                white-space: nowrap;
                 background-color: white;
                 box-shadow: 2px 2px 5px var(--main-color);
                 border-radius: 10px;
@@ -172,6 +273,8 @@ main {
             display: flex !important;
             flex-direction: column !important;
             align-items: center !important;
+            justify-content: center!important;
+            flex-grow: 1!important;
         }
 
         .new-values-grid {
@@ -181,19 +284,28 @@ main {
             justify-content: center;
             align-items: center;
             gap: 10px;
-
+            font-size: 10px;
+            align-self: end;
 
             > div {
                 display: flex;
                 flex-direction: column;
                 justify-content: space-between;
                 align-items: center;
-                width: 75%;
+                width: 100%;
+
+                >label {
+                    font-size: 12px;
+                }
+                >input[type="number"] {
+                    width: 40%;
+                }
             }
         }
 
         button {
-            width: 150px;
+            max-width: 150px;
+            width: 90%;
         }
     }
 }
@@ -235,6 +347,7 @@ footer {
     backdrop-filter: blur(3px);
     z-index: 999;
 }
+
 .loader {
     transform: rotateZ(45deg);
     perspective: 1000px;
@@ -259,7 +372,7 @@ footer {
 }
 
 .loader:after {
-    color: #FF3D00;
+    color: var(--accent-color);
     transform: rotateY(70deg);
     animation-delay: .4s;
 }
@@ -308,4 +421,27 @@ footer {
     87% {
         box-shadow: .2em -.2em 0 0 currentcolor;
     }
+}
+
+.mark {
+    cursor: pointer;
+}
+
+.tooltip {
+    position: absolute;
+    width: max-content;
+    height: auto;
+    font: 12px sans-serif;
+    background: var(--secondary-color);
+    color: var(--white-color);
+    padding: 20px;
+    border-radius: 8px;
+    opacity: 0;
+    transform: translate(-200px, -200px);
+    transition: opacity 0.3s, transform 0.3s;
+}
+
+
+.gauge-label {
+    font-size: 1em;
 }

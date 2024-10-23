@@ -1,30 +1,34 @@
 import {Card} from "react-bootstrap";
-import {LineChart} from "@mui/x-charts";
-import {Data} from "../Types/Data";
+import {DataHistory, DataKey, DataType} from "../Types/Data";
 import {UploadForm} from "./UploadForm";
-import React, {useMemo, useRef} from "react";
-import {useBoard} from "../Context/BoardContext";
-import {Command, NumberParameter} from "../Types/Command";
-import {CustomMark} from "./CustomMark";
+import React, {useEffect, useRef} from "react";
+import {Line} from "./Line";
+import {DataStructure} from "../Types/Board";
+import D3LineChart from "./LineChart";
+import {Gauge} from "./Gauge";
 
-export function InfoCard({k, value}: { k: string, value: string | number | boolean | string[] }) {
+export function InfoCard({k, value, structure, dataHistory}: {
+    k: DataKey,
+    value: DataType,
+    structure: DataStructure,
+    dataHistory?: DataHistory
+}) {
+    let [min, setMin] = React.useState<number>(0);
+    let [max, setMax] = React.useState<number>(0);
+
     const formatKey = (k: string) => {
         let keyParts = k.split(/(?<=[a-z])(?=[A-Z])|_/);
         keyParts = keyParts.map(part => part.charAt(0).toUpperCase() + part.slice(1));
         return keyParts.join(" ");
     }
 
-    const boardCtx = useBoard();
-
-    const findCommand = useMemo<Command | undefined>((): Command | undefined => {
-        return boardCtx.selectedBoard?.commands.find(cmd => cmd.for === k);
-    }, [boardCtx.selectedBoard, k]);
-
-    const mapToType = useMemo<string>(() => {
-        return boardCtx.selectedBoard?.commands.find(cmd => cmd.for === k)?.parameter.type || typeof value;
-    }, [boardCtx.selectedBoard?.commands, k]);
-
     const bodyRef = useRef<HTMLDivElement | null>(null);
+
+
+    useEffect(() => {
+        if (value < min) setMin(value as number);
+        if (value > max) setMax(value as number);
+    }, [value]);
 
     return (
         <>
@@ -32,62 +36,56 @@ export function InfoCard({k, value}: { k: string, value: string | number | boole
                 <Card.Header>{formatKey(k)}</Card.Header>
                 <Card.Body ref={bodyRef}>
                     {
-                        Array.isArray(value) ? value.map((v, i) => <Card.Text key={i}>{v}</Card.Text>) :
-                            <Card.Text>{value}</Card.Text>
+                        (!structure?.graph || structure.graph.type !== "circular") && (Array.isArray(value) ? value.map((v, i) =>
+                                    <Card.Text
+                                        key={i}>{v}</Card.Text>) :
+                                structure?.type === "number" ?
+                                    <Card.Text>{(value as number).toFixed(2)} {structure.unit}</Card.Text> :
+                                    <Card.Text>{value}</Card.Text>
+                        )
                     }
                     {
-                        mapToType === "number" && (
+                        structure?.graph?.type === "line" && dataHistory && (
                             <>
-                                <hr/>
-                                <LineChart width={(bodyRef.current?.clientWidth || 50) - 50}
-                                           height={(bodyRef.current?.clientWidth || 50) - 50}
-                                           xAxis={[
-                                               {
-                                                   valueFormatter: (value: Date) => value.toLocaleTimeString(),
-                                                   scaleType: "time",
-                                                   data: boardCtx.selectedBoard?.dataHistory[k as keyof Data]?.map((v) => new Date(v[1])) || []
-                                               }
-                                           ]}
-                                           margin={{top: 50, right: 50, bottom: 50, left: 50}}
-                                           yAxis={[{
-                                               scaleType: "linear",
-                                               min: (findCommand?.parameter as NumberParameter)?.min || 0,
-                                               max: (findCommand?.parameter as NumberParameter)?.max || 100,
-                                           }]}
-                                           skipAnimation={true}
-                                           series={[{
-                                               curve: "linear",
-                                               data: boardCtx.selectedBoard?.dataHistory[k as keyof Data]?.map((v) => v[0]) || [],
-
-                                           }]}
-                                           slots={{
-                                               mark: CustomMark,
-                                           }}
-                                           key={k + "chart"}
-                                           sx={{
-                                               "& .customMarkElement": {
-                                                   scale: "0.5",
-                                               }
-                                           }}
-                                >
-
-                                </LineChart>
+                                <Line/>
+                                <D3LineChart
+                                    unit={structure.unit}
+                                    data={dataHistory as DataHistory<number>}
+                                    width={bodyRef.current?.clientWidth || 200}
+                                    height={(bodyRef.current?.clientWidth || 200) * (structure.heightScale || 1)}
+                                    key={k + "line"}
+                                    minY={min}
+                                    maxY={max}
+                                />
                             </>
                         )
                     }
                     {
-                        findCommand && (
+                        structure?.graph?.type === "circular" && (
                             <>
-                                <hr key={k + "hr"}/>
-
-                                <UploadForm key={k} k={k} formatKey={formatKey} command={findCommand}/>
+                            <Gauge  width={bodyRef.current?.clientWidth || 200}
+                                    height={(bodyRef.current?.clientWidth || 200) * (structure.heightScale || 1)}
+                                   startAngle={90}
+                                   endAngle={-90}
+                                   minValue={structure.graph.min || 0}
+                                   maxValue={structure.graph.max || 360}
+                                   value={value as number}
+                                   unit={structure.unit}
+                            />
                             </>
+                            )
+                            }
+                            {
+                                structure?.commands["set"] && (
+                                    <>
+                                        <UploadForm key={k} k={k} formatKey={formatKey} command={structure.commands["set"]}/>
+                                    </>
+                                )
+                            }
+
+                            </Card.Body>
+                        </Card>
+
+                        </>
                         )
                     }
-
-                </Card.Body>
-            </Card>
-
-        </>
-    )
-}
